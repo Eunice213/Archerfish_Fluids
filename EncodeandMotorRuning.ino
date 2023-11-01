@@ -36,17 +36,13 @@ float velocity = 0; // plunger velocity
 float flowvolume = 0; // total fluid dispensed 
 float flowrate = 0; // volumetric flow rate 
 float r = 6.67/2; // syringe radius in mm 
-String D = " DEG";
-String M = " mm"; 
-String V = " mm/s"; 
 unsigned long previousTime = 0; 
 unsigned long sampleTime;  
 unsigned long timeChange;
 
-int c = 100; // cycle numbers for intervals to take speed measurements at
-int cycle = 0; 
-
- 
+unsigned long sampleRate = 500; // cycle numbers for intervals to take speed measurements at
+bool newVelocity = false; // do not change this 
+int motspeed = 0; 
 void setup()
 {
  
@@ -57,8 +53,8 @@ void setup()
   checkMagnetPresence(); //check the magnet (blocks until magnet is found)
   
   stepper.setMaxSpeed(1000);
-  stepper.setSpeed(10);  
-  delay(100);
+  stepper.setSpeed(motspeed);  
+  delay(500);
   // This delay is important because it allows the correct start angle to be obtained after the shaft has initialzed and stablized
   ReadRawAngle(); //make a reading so the degAngle gets updated
   startAngle = degAngle; //update startAngle with degAngle - for taring
@@ -131,17 +127,13 @@ void ReadRawAngle()
   //360/4096 = 0.087890625
   //Multiply the output of the encoder with 0.087890625
   degAngle = rawAngle * 0.087890625;
-  if (cycle != c) {
-    //Serial.println("c");
-    //Serial.println(cycle);
-    cycle+=1;
-   }
-  if (cycle == c) {
-    sampleTime = millis();  
-    timeChange = sampleTime - previousTime; // should always be positive
+  sampleTime = millis();  
+  timeChange = sampleTime - previousTime; // should always be positive
+  if (timeChange >= sampleRate) {
     previousTime = sampleTime; 
     Serial.println("timeChange"); 
-    Serial.println(timeChange); 
+    Serial.println(timeChange);
+    newVelocity = true; 
   }
   
   //Serial.print("Deg angle: ");
@@ -221,13 +213,12 @@ void checkQuadrant()
   //Serial.println(numberofTurns,0); //number of turns in absolute terms (can be negative which indicates CCW turns)  
 
   //after we have the corrected angle and the turns, we can calculate the total absolute position
-  totalAngle = (numberofTurns*360) + correctedAngle; //number of turns (+/-) plus the actual angle within the 0-360 range
-  if (cycle == c) { 
-    angleChange = totalAngle - previousAngle;  
-    previousAngle = totalAngle; 
+  totalAngle = (numberofTurns*360) + correctedAngle; //number of turns (+/-) plus the actual angle within the 0-360 range 
+  if (newVelocity) {  
+    angleChange = totalAngle - previousAngle;
+    previousAngle = totalAngle;  
     Serial.println("angleChange");
     Serial.println(angleChange);
-    cycle = 0; 
   }
 
   //Serial.print("Total angle: ");
@@ -274,8 +265,12 @@ if ((magnetStatus & 16)==16){
 
 void distancetraveled(){
   distance = totalAngle*2/360; // 2mm lead = 2mm traveled per revolution 
-  velocity = (angleChange*2/360)/(timeChange/1000); // mm/s 
-  Serial.println("angleChange " + String(angleChange,3)+" timeChange "+String(timeChange) + " Velocity " + String(velocity,3));
+  if (newVelocity){
+    velocity = angleChange*2*1000/(360*timeChange); // mm/s 
+    Serial.println("angleChange " + String(angleChange,3)+" timeChange "+String(timeChange) + " Velocity " + String(velocity,5));
+    newVelocity = false; 
+  } 
+ 
   //Serial.println("angleChange:");
   //Serial.println(angleChange);
   //Serial.println("timeChange");
@@ -286,14 +281,14 @@ void distancetraveled(){
 
 void refreshDisplay()
 {
-  if (millis() - OLEDTimer > 100) //chech if we will update at every 100 ms
+  if (millis() - OLEDTimer > 100) //chech if we will update at every 100 ms                                                                  
   { 
     if(totalAngle != previoustotalAngle) //if there's a change in the position*
     {
         oled.clear(); //delete the content of the display
-        oled.println(totalAngle + D); //print the new absolute position 
-        oled.println(distance + M); //print the new absolute distance
-        oled.println(velocity + V); 
+        oled.println(String(totalAngle) + " DEG"); //print the new absolute position 
+        oled.println(String(distance) + " mm"); //print the new absolute distance
+        oled.println(String(velocity,5) + " mm/s"); 
         OLEDTimer = millis(); //reset timer   
         previoustotalAngle = totalAngle; //update the previous value
         //Serial.println(totalAngle);
