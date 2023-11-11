@@ -40,6 +40,11 @@ unsigned long previousTime = 0;
 unsigned long sampleTime;  
 unsigned long timeChange;
 
+float xn ;
+float yn;
+float xn1 = 0;
+float yn1 = 0;
+int k = 0;
 unsigned long sampleRate = 500; // cycle numbers for intervals to take speed measurements at
 bool newVelocity = false; // do not change this 
 int motspeed = 0; 
@@ -72,7 +77,7 @@ void setup()
   oled.set1X(); //double-line font size - better to read it
   oled.println("Welcome!"); //print a welcome message  
   oled.println("AS5600"); //print a welcome message
-  delay(3000);
+  delay(10000);
   OLEDTimer = millis(); //start the timer
   
 }
@@ -85,7 +90,33 @@ void loop()
     distancetraveled(); // Find distance traveled
     refreshDisplay(); // Display distance traveled
     stepper.runSpeed();
-    //delay(100); //wait a little - adjust it for "better resolution"
+
+    xn = totalAngle;
+    //yn = 0.999*yn1 + 0.000314*xn + 0.000314*xn1; // cutoff frequency of 1Hz 
+    yn = 0.969*yn1 + 0.0155*xn + 0.0155*xn1; // cutoff frequency of 5hz 
+
+    delay(1);
+    xn1 = xn;
+    yn1 = yn;
+     if(k % 3 == 0){
+    // This extra conditional statement is here to reduce
+    // the number of times the data is sent through the serial port
+    // because sending data through the serial port
+    // messes with the sampling frequency
+  
+    // Output
+    Serial.print(totalAngle);
+    Serial.print(" ");
+    Serial.println(yn);
+    Serial.print(" ");
+    Serial.print(velocity);
+  }
+  k = k+1;
+    
+
+    //Serial.print("Total Angle");
+
+  delay(100); //wait a little - adjust it for "better resolution"
 
 }
 
@@ -131,8 +162,8 @@ void ReadRawAngle()
   timeChange = sampleTime - previousTime; // should always be positive
   if (timeChange >= sampleRate) {
     previousTime = sampleTime; 
-    Serial.println("timeChange"); 
-    Serial.println(timeChange);
+    //Serial.println("timeChange"); 
+    //Serial.println(timeChange);
     newVelocity = true; 
   }
   
@@ -216,9 +247,9 @@ void checkQuadrant()
   totalAngle = (numberofTurns*360) + correctedAngle; //number of turns (+/-) plus the actual angle within the 0-360 range 
   if (newVelocity) {  
     angleChange = totalAngle - previousAngle;
-    previousAngle = totalAngle;  
-    Serial.println("angleChange");
-    Serial.println(angleChange);
+    previousAngle = totalAngle; 
+    //Serial.println("angleChange");
+    //Serial.println(angleChange);
   }
 
   //Serial.print("Total angle: ");
@@ -241,11 +272,11 @@ void checkMagnetPresence()
     while(Wire.available() == 0); //wait until it becomes available 
     magnetStatus = Wire.read(); //Reading the data after the request
 if ((magnetStatus & 16)==16){
-    Serial.println("Too weak: Move Magnet Closer");
+    //Serial.println("Too weak: Move Magnet Closer");
     //Serial.println(magnetStatus); 
     } 
     if ((magnetStatus & 8)==8){
-    Serial.println("Too strong: Move Magnet Away");
+    //Serial.println("Too strong: Move Magnet Away");
     //Serial.println(magnetStatus); 
     }  
   }      
@@ -267,7 +298,7 @@ void distancetraveled(){
   distance = totalAngle*2/360; // 2mm lead = 2mm traveled per revolution 
   if (newVelocity){
     velocity = angleChange*2*1000/(360*timeChange); // mm/s 
-    Serial.println("angleChange " + String(angleChange,3)+" timeChange "+String(timeChange) + " Velocity " + String(velocity,5));
+    //Serial.println("angleChange " + String(angleChange,3)+" timeChange "+String(timeChange) + " Velocity " + String(velocity,5));
     newVelocity = false; 
   } 
  
