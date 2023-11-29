@@ -29,25 +29,43 @@ float correctedAngle = 0; //tared angle - based on the startup value
 float startAngle = 0; //starting angle
 float totalAngle = 0; //total absolute angular displacement
 float previousAngle = 0; 
-float angleChange; 
+float angleChange;  
 float previoustotalAngle = 0; //for the display printing
 float distance = 0; // Total distance travled in mm 
 float velocity = 0; // plunger velocity 
 float flowvolume = 0; // total fluid dispensed 
 float flowrate = 0; // volumetric flow rate 
+float flowvolumeF = 0; // total fluid dispensed 
+float flowrateF = 0;
 float r = 6.67/2; // syringe radius in mm 
 unsigned long previousTime = 0; 
 unsigned long sampleTime;  
 unsigned long timeChange;
 
-float xn ;
-float yn;
+float xn0 ;
+float yn0;
 float xn1 = 0;
 float yn1 = 0;
+
+float xnv ;
+float ynv;
+float xn1v = 0;
+float yn1v = 0;
+
+float xnd ;
+float ynd;
+float xn1d = 0;
+float yn1d = 0;
+
+float xnfr ;
+float ynfr;
+float xn1fr = 0;
+float yn1fr = 0;
+
 int k = 0;
 unsigned long sampleRate = 500; // cycle numbers for intervals to take speed measurements at
 bool newVelocity = false; // do not change this 
-int motspeed = 0; 
+int motspeed = -50; 
 void setup()
 {
  
@@ -58,7 +76,7 @@ void setup()
   checkMagnetPresence(); //check the magnet (blocks until magnet is found)
   
   stepper.setMaxSpeed(1000);
-  stepper.setSpeed(motspeed);  
+  stepper.setSpeed(motspeed); 
   delay(500);
   // This delay is important because it allows the correct start angle to be obtained after the shaft has initialzed and stablized
   ReadRawAngle(); //make a reading so the degAngle gets updated
@@ -78,7 +96,8 @@ void setup()
   oled.println("Welcome!"); //print a welcome message  
   oled.println("AS5600"); //print a welcome message
   delay(10000);
-  OLEDTimer = millis(); //start the timer
+  OLEDTimer = millis(); //start the timer 
+  
   
 }
 
@@ -89,34 +108,44 @@ void loop()
     checkQuadrant(); //check quadrant, check rotations, check absolute angular position
     distancetraveled(); // Find distance traveled
     refreshDisplay(); // Display distance traveled
-    stepper.runSpeed();
+    xn1 = xn0;
+    yn1 = yn0;
 
-    xn = totalAngle;
-    //yn = 0.999*yn1 + 0.000314*xn + 0.000314*xn1; // cutoff frequency of 1Hz 
-    yn = 0.969*yn1 + 0.0155*xn + 0.0155*xn1; // cutoff frequency of 5hz 
+    xn1v = xnv;
+    yn1v = ynv;
 
-    delay(1);
-    xn1 = xn;
-    yn1 = yn;
-     if(k % 3 == 0){
+    xn1d = xnd;
+    yn1d = ynd;
+
+    xn1fr = xnfr;
+    yn1fr = ynfr;
+    // xn is the unfiltered signal 
+    // yn is the filtered signal
+    //if(k % 3 == 0){
     // This extra conditional statement is here to reduce
     // the number of times the data is sent through the serial port
     // because sending data through the serial port
     // messes with the sampling frequency
   
     // Output
-    Serial.print(totalAngle);
-    Serial.print(" ");
-    Serial.println(yn);
-    Serial.print(" ");
     Serial.print(velocity);
-  }
-  k = k+1;
+    Serial.print(" ");
+    Serial.println(ynv);
+    //Serial.print(" ");
+    //Serial.println(flowrate);
+    //lnSerial.print(" ");
+    //Serial.print(flowrateF);
+    //Serial.print(" ");
+    //Serial.println(ynfr);
+  //}
+  //k = k+1;
+   
+  stepper.runSpeed();
     
 
     //Serial.print("Total Angle");
 
-  delay(100); //wait a little - adjust it for "better resolution"
+  //delay(100); //wait a little - adjust it for "better resolution"
 
 }
 
@@ -245,6 +274,8 @@ void checkQuadrant()
 
   //after we have the corrected angle and the turns, we can calculate the total absolute position
   totalAngle = (numberofTurns*360) + correctedAngle; //number of turns (+/-) plus the actual angle within the 0-360 range 
+  xn0 = totalAngle;
+  yn0 = 0.969*yn1 + 0.0155*xn0 + 0.0155*xn1; // cutoff frequency of 5hz 
   if (newVelocity) {  
     angleChange = totalAngle - previousAngle;
     previousAngle = totalAngle; 
@@ -263,22 +294,30 @@ void checkMagnetPresence()
   while((magnetStatus & 32) != 32) //while the magnet is not adjusted to the proper distance - 32: MD = 1
   {
     magnetStatus = 0; //reset reading
+    Serial.println("checking1");
+    
 
     Wire.beginTransmission(0x36); //connect to the sensor
+    Serial.println("checking2");
     Wire.write(0x0B); //figure 21 - register map: Status: MD ML MH
+    Serial.println("checking3");
     Wire.endTransmission(); //end transmission
+    Serial.println("checking4");
     Wire.requestFrom(0x36, 1); //request from the sensor
+    Serial.println("checking5");
 
-    while(Wire.available() == 0); //wait until it becomes available 
+    while(Wire.available() == 0){ //wait until it becomes available 
+    Serial.println("checking7");
+    }
     magnetStatus = Wire.read(); //Reading the data after the request
-if ((magnetStatus & 16)==16){
-    //Serial.println("Too weak: Move Magnet Closer");
-    //Serial.println(magnetStatus); 
-    } 
-    if ((magnetStatus & 8)==8){
-    //Serial.println("Too strong: Move Magnet Away");
-    //Serial.println(magnetStatus); 
-    }  
+    if ((magnetStatus & 16)==16){
+        Serial.println("Too weak: Move Magnet Closer");
+        Serial.println(magnetStatus); 
+        } 
+        if ((magnetStatus & 8)==8){
+        Serial.println("Too strong: Move Magnet Away");
+        Serial.println(magnetStatus); 
+        }  
   }      
   //Note that serial print does not display the actual value of magnetstatus (ie. it will not display 00100000 or 00010000 or 00001000) 
   //However internally the arduino does read 00100000 or 00010000 or 00001000 and uses these values
@@ -301,6 +340,12 @@ void distancetraveled(){
     //Serial.println("angleChange " + String(angleChange,3)+" timeChange "+String(timeChange) + " Velocity " + String(velocity,5));
     newVelocity = false; 
   } 
+    // Let's filter velocity and Distance too
+  xnv = velocity; 
+  ynv = 0.969*yn1v + 0.0155*xnv + 0.0155*xn1v; // cutoff frequency of 5hz 
+
+  xnd = distance; 
+  ynd = 0.969*yn1d + 0.0155*xnd + 0.0155*xn1d; // cutoff frequency of 5hz 
  
   //Serial.println("angleChange:");
   //Serial.println(angleChange);
@@ -308,6 +353,11 @@ void distancetraveled(){
   //Serial.println(timeChange);
   flowvolume = PI*(r*r)*distance; // mm^3 
   flowrate = PI*r*r*velocity; // mm^3/s 
+  flowvolumeF = PI*(r*r)*ynd; // mm^3 
+  flowrateF = PI*r*r*ynv; // mm^3/s
+  xnfr = flowrate; 
+  //ynfr = 0.969*yn1fr + 0.0155*xnfr + 0.0155*xnfr; // cutoff frequency of 5hz 
+  ynfr = 0.9752*yn1fr + 0.0124*xnfr + 0.0124*xnfr; // cutoff frequency of 4hz 
 }
 
 void refreshDisplay()
