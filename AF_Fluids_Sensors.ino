@@ -7,7 +7,9 @@ Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 
 //---------------------------------------------------------------------------
 //Stepper Motor Stuff
-AccelStepper stepper(1,8,9); // (mode, PUL,DIR) Defaults to AccelStepper::FULL4WIRE (4 pins) on 2, 3, 4, 5
+int pulpin = 8; 
+int dirpin = 9; 
+AccelStepper stepper(1,pulpin,dirpin); // (mode, PUL,DIR) Defaults to AccelStepper::FULL4WIRE (4 pins) on 2, 3, 4, 
 int set = 1000; // Stage speed during calibration 
 //---------------------------------------------------------------------------
 //Calculating Flow rate from Encoder
@@ -98,6 +100,9 @@ float startdist;
 //Limit Switch
 ezButton limitSwitch(7);  // create ezButton object that attach to pin 7;
 bool atswitch = false; 
+//---------------------------------------------------------------------------
+//Serial Communication 
+String command; 
 
 
 
@@ -128,66 +133,91 @@ void setup()
     while (1);
   }
 
-  //----------------------------------------------------------------------------
-  // Calibate the Pot and the Encoder
-  calibratepot(); 
-  ReadRawAngle(); //make a reading so the degAngle gets updated
-  startAngle = degAngle; //update startAngle with degAngle - for taring
-  stroke = lead / pulses ; // how many mm to screw travels per step
-  theory = motspeed * stroke; // Theoretical screw velocity in mm/s is the motor speed in steps/ second times the stroke
-  time1 = millis();
-
 
 }
 
 void loop()
 { 
-  //-------------------------------------------------------------------------------------------------------------
-  // Functions 
-  readADC(); // Read ADC value
-  ReadRawAngle(); //ask the value from the sensor
-  correctAngle(); //tare the value
-  checkQuadrant(); //check quadrant, check rotations, check absolute angular position
-  distancetraveled(); // Find distance traveled
+  if (Serial.available() > 0) {
+    // Read the incoming command
+    command = Serial.readStringUntil('\n');
+    command.trim();}
+    
+  if (command.equals("calibrate")){
+    //----------------------------------------------------------------------------
+    // Calibate the Pot and the Encoder
+    calibratepot(); 
+    givecontrol(pulpin,dirpin);
+    ReadRawAngle(); //make a reading so the degAngle gets updated
+    startAngle = degAngle; //update startAngle with degAngle - for taring
+    stroke = lead / pulses ; // how many mm to screw travels per step
+    theory = motspeed * stroke; // Theoretical screw velocity in mm/s is the motor speed in steps/ second times the stroke
+    time1 = millis();
+    }
+  else if(command.equals("take")){
+    takecontrol(pulpin,dirpin);
+  }
+  else if(command.equals("give")){
+    givecontrol(pulpin,dirpin);
+  }
 
-  //----------------------------------------------------------------------------------------------------------------
-  // Digital Filter Values
-  // xn is the unfiltered signal
-  // yn is the filtered signal
-  xn1 = xn0;// Encoder Angular Distance
-  yn1 = yn0;
-
-  xn1v = xnv;// Encoder velocity 
-  yn1v = ynv;
-
-  xn1d = xnd;// Encoder Distance
-  yn1d = ynd;
-
-  xn1fr = xnfr; // Encoder Flow rate
-  yn1fr = ynfr;
-
-  xn1p = xnp; // Pot Value 
-  yn1p = ynp;
-
-  //---------------------------------------------------------------------------------------------------------------------
-  // Outputs
-  Serial.print(millis()); // time in millis
-  Serial.print(" ");
-  Serial.print(velocity,3); // Encoder Velocity Reading
-  //Serial.print(" ");
-  //Serial.print(rawread,3); // Raw digital input from the encoder 
-  Serial.print(" ");
-  Serial.print(ynv,3); // Filtered Encoder Velocity
-  Serial.print(" ");
-  Serial.print(theory,3); // Theretical Encoder Output based on given encoder speed variable motspeed 
-  Serial.print(" ");
-  Serial.print(mvtomm,3); // Conversion factor from potentiometer mV reading to location in mm
-  Serial.print(" ");
-  Serial.print(results); // Raw Pot reading
-  Serial.print(" ");
-  Serial.print(pot,3); // Unfiltered pot location 
-  Serial.print(" ");
-  Serial.println(ynp,3); // Filtered pot location
+  else if(command.equals("start")){
+    while(command.equals("start")){        
+      //-------------------------------------------------------------------------------------------------------------
+      // Functions 
+      readADC(); // Read ADC value
+      ReadRawAngle(); //ask the value from the sensor
+      correctAngle(); //tare the value
+      checkQuadrant(); //check quadrant, check rotations, check absolute angular position
+      distancetraveled(); // Find distance traveled
+    
+      //----------------------------------------------------------------------------------------------------------------
+      // Digital Filter Values
+      // xn is the unfiltered signal
+      // yn is the filtered signal
+      xn1 = xn0;// Encoder Angular Distance
+      yn1 = yn0;
+    
+      xn1v = xnv;// Encoder velocity 
+      yn1v = ynv;
+    
+      xn1d = xnd;// Encoder Distance
+      yn1d = ynd;
+    
+      xn1fr = xnfr; // Encoder Flow rate
+      yn1fr = ynfr;
+    
+      xn1p = xnp; // Pot Value 
+      yn1p = ynp;
+    
+      //---------------------------------------------------------------------------------------------------------------------
+      // Outputs
+      Serial.print(millis()); // time in millis
+      Serial.print(" ");
+      Serial.print(velocity,3); // Encoder Velocity Reading
+      //Serial.print(" ");
+      //Serial.print(rawread,3); // Raw digital input from the encoder 
+      Serial.print(" ");
+      Serial.print(ynv,3); // Filtered Encoder Velocity
+      Serial.print(" ");
+      Serial.print(theory,3); // Theretical Encoder Output based on given encoder speed variable motspeed 
+      Serial.print(" ");
+      Serial.print(mvtomm,3); // Conversion factor from potentiometer mV reading to location in mm
+      Serial.print(" ");
+      Serial.print(results); // Raw Pot reading
+      Serial.print(" ");
+      Serial.print(pot,3); // Unfiltered pot location 
+      Serial.print(" ");
+      Serial.println(ynp,3); // Filtered pot location
+      if (Serial.available() > 0) { // Check for new command
+        // Read the incoming command
+        command = Serial.readStringUntil('\n');
+        command.trim();}
+     }
+  }
+  else if (command.equals("stop")) {
+    Serial.println("stopped"); 
+    }
 }
 
 void ReadRawAngle()
@@ -520,4 +550,14 @@ void calibratepot(){
     }
   }
 
+}
+
+
+void takecontrol(int pul,int dir){
+   pinMode(pul, OUTPUT); 
+   pinMode(dir, OUTPUT); 
+}
+void givecontrol(int pul,int dir){
+   pinMode(pul, INPUT); 
+   pinMode(dir, INPUT); 
 }
