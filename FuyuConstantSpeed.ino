@@ -24,7 +24,6 @@ float x = 0;
 int set = 100;
 unsigned long start; 
 
-
 //----------------------------------------------------------------------------------
 // Serial Communication 
 String command ;
@@ -32,37 +31,41 @@ String command ;
 void setup()
 {  Serial.begin(9600); //start serial - tip: don't use serial if you don't need it (speed considerations)
    stepper.setMaxSpeed(1000);
-   stepper.setSpeed(set);	
+   stepper.setSpeed(0);	
    start = millis();
 }
 
-void loop(){   
-  if (Serial.available() > 0) {
-    // Read the incoming command
-    command = Serial.readStringUntil('\n');
-    command.trim();}
-    
-  if (command.equals("ramp")){
-      if ((millis() - start)>= ramp && x<= 10){
-      stepper.setSpeed(base*x); 
-      x+=1 ; 
-      start = millis();
-      }
+void loop() {
+    if (Serial.available() > 0) {
+        command = Serial.readStringUntil('\n');
+        command.trim();
+
+        if (command.equals("ramp")) {
+            ramping = true;
+            start = millis();
+            x = 0;
+        } else if (command.equals("stop")) {
+            ramping = false;
+            stepper.setSpeed(0);
+        } else if (command.equals("constant")) {
+            ramping = false;
+            stepper.setSpeed(set);
+        } else if (command.equals("take")) {
+            takecontrol(pulpin, dirpin);
+        } else if (command.equals("give")) {
+            givecontrol(pulpin, dirpin);
+        }
     }
-  else if (command.equals("stop")) {
-    stepper.setSpeed(0);
+
+    if (ramping && (millis() - start) >= ramp && x <= 10) {
+        stepper.setSpeed(base * x);
+        x += 1;
+        start = millis();
     }
-  else if (command.equals("constant")) {
-    stepper.setSpeed(set);
-    }
-  else if (command.equals("take")) {
-    takecontrol(pulpin,dirpin);
-  }
-  else if (command.equals("give")) {
-    givecontrol(pulpin,dirpin);
-  }  
-   stepper.runSpeed();
+
+    stepper.runSpeed();
 }
+
 
 void takecontrol(int pul,int dir){
    pinMode(pul, OUTPUT); 
