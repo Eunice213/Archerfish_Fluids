@@ -7,8 +7,8 @@ Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 
 //---------------------------------------------------------------------------
 //Stepper Motor Stuff
-int pulpin = 8; 
-int dirpin = 9; 
+int pulpin = 9; 
+int dirpin = 10; 
 AccelStepper stepper(1,pulpin,dirpin); // (mode, PUL,DIR) Defaults to AccelStepper::FULL4WIRE (4 pins) on 2, 3, 4, 
 int set = 1000; // Stage speed during calibration 
 //---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ unsigned long caltime = 30000; // time to calibrate the starting position of the
 float startdist; 
 //---------------------------------------------------------------------------
 //Limit Switch
-ezButton limitSwitch(7);  // create ezButton object that attach to pin 7;
+ezButton limitSwitch(13);  // create ezButton object that attach to pin 7;
 bool atswitch = false; 
 //---------------------------------------------------------------------------
 //Serial Communication 
@@ -141,7 +141,7 @@ void loop()
   if (Serial.available() > 0) {
     // Read the incoming command
     command = Serial.readStringUntil('\n');
-    command.trim();}
+    command.trim();}                                                                                                                                                                                                                                                                                  
     
   if (command.equals("calibrate")){
     //----------------------------------------------------------------------------
